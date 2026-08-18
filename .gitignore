@@ -1,0 +1,19 @@
+# basura de macOS
+.DS_Store
+
+# caches de Python / herramientas
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# entornos virtuales, por si alguien crea uno local
+.venv/
+venv/
+
+# nunca secretos en el repo
+.env
+
+# el enunciado de la tarea no es parte de la entrega
+pauta-tarea-mlops.pdf
