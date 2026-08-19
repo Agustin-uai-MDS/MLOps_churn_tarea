@@ -1,0 +1,154 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el código del repo
+        uses: actions/checkout@v4
+
+      - name: Instalar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependencias de desarrollo
+        run: pip install -r requirements-dev.txt
+
+      - name: ruff check (linter)
+        run: ruff check .
+
+      - name: ruff format --check (formateador)
+        run: ruff format --check .
+
+  test:
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el código del repo
+        uses: actions/checkout@v4
+
+      - name: Instalar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependencias de desarrollo
+        run: pip install -r requirements-dev.txt
+
+      - name: pytest
+        run: pytest -v
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el código del repo
+        uses: actions/checkout@v4
+
+      - name: Construir la imagen Docker
+        run: docker build -t churn-api:ci .
+
+      - name: Exportar la imagen a un archivo
+        run: docker save churn-api:ci -o churn-api.tar
+
+      - name: Subir la imagen como artefacto (para que el job smoke la use)
+        uses: actions/upload-artifact@v4
+        with:
+          name: churn-api-image
+          path: churn-api.tar
+          retention-days: 1
+
+  smoke:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el artefacto con la imagen
+        uses: actions/download-artifact@v4
+        with:
+          name: churn-api-image
+
+      - name: Cargar la imagen en Docker
+        run: docker load -i churn-api.tar
+
+      - name: Levantar el contenedor
+        run: docker run -d --name churn-api -p 8000:8000 churn-api:ci
+
+      - name: Esperar a que el healthcheck pase
+        run: |
+          for i in $(seq 1 15); do
+            status=$(docker inspect -f '{{.State.Health.Status}}' churn-api 2>/dev/null || echo "starting")
+            echo "intento $i: $status"
+            if [ "$status" = "healthy" ]; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "El contenedor nunca quedó healthy"
+          docker logs churn-api
+          exit 1
+
+      - name: GET /health responde 200
+        run: curl -sf http://localhost:8000/health
+
+      - name: POST /predict responde con una predicción real
+        run: |
+          curl -sf -X POST http://localhost:8000/predict \
+            -H "Content-Type: application/json" \
+            -d '{
+              "gender": "Female", "SeniorCitizen": 0, "Partner": "Yes", "Dependents": "No",
+              "tenure": 1, "PhoneService": "No", "MultipleLines": "No phone service",
+              "InternetService": "DSL", "OnlineSecurity": "No", "OnlineBackup": "Yes",
+              "DeviceProtection": "No", "TechSupport": "No", "StreamingTV": "No", "StreamingMovies": "No",
+              "Contract": "Month-to-month", "PaperlessBilling": "Yes", "PaymentMethod": "Electronic check",
+              "MonthlyCharges": 29.85, "TotalCharges": 29.85
+            }'
+
+      - name: Logs del contenedor (por si algo falló arriba)
+        if: failure()
+        run: docker logs churn-api
+
+      - name: Apagar el contenedor
+        if: always()
+        run: docker rm -f churn-api
+
+  publish:
+    needs: smoke
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Descargar el artefacto con la imagen ya probada
+        uses: actions/download-artifact@v4
+        with:
+          name: churn-api-image
+
+      - name: Cargar la imagen en Docker
+        run: docker load -i churn-api.tar
+
+      - name: Iniciar sesión en GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Nombre de la imagen en minúsculas (GHCR lo exige)
+        id: image
+        run: echo "name=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+      - name: Etiquetar y publicar en GHCR
+        run: |
+          docker tag churn-api:ci ${{ steps.image.outputs.name }}:${{ github.ref_name }}
+          docker tag churn-api:ci ${{ steps.image.outputs.name }}:latest
+          docker push ${{ steps.image.outputs.name }}:${{ github.ref_name }}
+          docker push ${{ steps.image.outputs.name }}:latest
