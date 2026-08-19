@@ -1,0 +1,26 @@
+# entornos y cachés locales
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# control de versiones
+.git/
+.gitignore
+
+# no hacen falta para servir la API (solo para entrenar/explorar)
+data/
+notebooks/
+
+# tests y herramientas de desarrollo
+tests/
+requirements-dev.txt
+
+# nunca secretos dentro de la imagen
+.env
+
+# metadatos del proyecto, no del runtime
+README.md
+docs/
+pauta-tarea-mlops.pdf
