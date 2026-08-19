@@ -146,8 +146,10 @@ ruff format --check . # formateador
 
 Registro de modelos con MLflow en vez de artefactos versionados directamente en Git, y probar `HistGradientBoostingClassifier` para exprimir un poco más de ROC-AUC.
 
+## Video demostración
+
+[Ver video demo](docs/video_compressed.mp4)
+
 ## Uso de asistentes de IA
 
 Se usó Claude (Anthropic, vía Claude Code) como asistente durante todo el desarrollo: diseño del feature engineering y del ETL, arquitectura de la API (separación config/schemas/predictor/main), configuración de Docker, diseño y depuración del pipeline de CI/CD (incluyendo pruebas locales con `act` antes de cada push), y redacción de este README. Cada decisión de diseño fue discutida y revisada antes de aplicarse; el equipo puede explicar y defender cualquier parte del código.
-
-prueba
