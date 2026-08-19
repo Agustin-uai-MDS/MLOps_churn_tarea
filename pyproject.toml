@@ -1,0 +1,26 @@
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+# el notebook es solo para exploración (ver README); la fuente de verdad
+# real es training/features.py, que sí se exige limpio
+extend-exclude = ["notebooks"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle (estilo)
+    "F",   # pyflakes (imports/variables sin usar, nombres indefinidos)
+    "I",   # isort (orden de imports)
+    "UP",  # pyupgrade (sintaxis moderna de Python)
+    "B",   # bugbear (patrones que suelen ser bugs)
+    "C4",  # comprehensions más simples
+    "SIM", # simplificaciones obvias
+]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# sin esto, "pytest" a secas (sin "-m") no encuentra el paquete app/ ni
+# training/ al correr desde CI — ver ci.yml, job test
+pythonpath = ["."]
